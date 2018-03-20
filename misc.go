@@ -25,7 +25,10 @@ import (
 
 	"github.com/gambol99/go-oidc/jose"
 	"go.uber.org/zap"
+	"strings"
 )
+
+const PathParamPrefix = ":path:"
 
 // filterCookies is responsible for censoring any cookies we don't want sent
 func filterCookies(req *http.Request, filter []string) error {
@@ -96,7 +99,7 @@ func (r *oauthProxy) redirectToAuthorization(w http.ResponseWriter, req *http.Re
 		return r.revokeProxy(w, req)
 	}
 	// step: add a state referrer to the authorization page
-	authQuery := fmt.Sprintf("?state=%s", base64.StdEncoding.EncodeToString([]byte(req.URL.RequestURI())))
+	authQuery := fmt.Sprintf("?state=%s", r.generateStateParam(req.URL.RequestURI()))
 
 	// step: if verification is switched off, we can't authorization
 	if r.config.SkipTokenVerification {
@@ -120,4 +123,21 @@ func (r *oauthProxy) getAccessCookieExpiration(token jose.JWT, refresh string) t
 	}
 
 	return duration
+}
+
+// generateStateParam creates a new base64-encoded value to use as the `state`
+// query parameter for an auth redirect
+func (r *oauthProxy) generateStateParam(uri string) string {
+	state := PathParamPrefix + uri
+	return base64.RawURLEncoding.EncodeToString([]byte(state))
+}
+
+// pathFromStateParam returns the encoded path from a state value created by a
+// prior call to generateStateParam
+func (r *oauthProxy) pathFromStateParam(state string) (string, error) {
+	decoded, err := base64.RawURLEncoding.DecodeString(state)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimPrefix(string(decoded), PathParamPrefix), nil
 }

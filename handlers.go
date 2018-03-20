@@ -17,7 +17,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -196,19 +195,18 @@ func (r *oauthProxy) oauthCallbackHandler(w http.ResponseWriter, req *http.Reque
 	}
 
 	// step: decode the state variable
-	state := "/"
-	if req.URL.Query().Get("state") != "" {
-		decoded, err := base64.StdEncoding.DecodeString(req.URL.Query().Get("state"))
+	redirectPath := "/"
+	if state := req.URL.Query().Get("state"); state != "" {
+		statePath, err := r.pathFromStateParam(state)
 		if err != nil {
-			r.log.Warn("unable to decode the state parameter",
-				zap.String("state", req.URL.Query().Get("state")),
+			r.log.Warn("unable to retrieve redirect path from the state parameter",
+				zap.String("state", state),
 				zap.Error(err))
-		} else {
-			state = string(decoded)
 		}
+		redirectPath = statePath
 	}
 
-	r.redirectToURL(state, w, req)
+	r.redirectToURL(redirectPath, w, req)
 }
 
 // loginHandler provide's a generic endpoint for clients to perform a user_credentials login to the provider
